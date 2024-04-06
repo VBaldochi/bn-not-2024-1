@@ -19,7 +19,18 @@ controller.create = async function(req, res) {
 
 controller.retrieveAll = async function(req, res) {
   try {
-    const result = await Venda.find().sort({ nome: 'asc' })
+    const query = Venda.find().sort({ num: 'asc' })
+
+    // Verifica se o parâmetro 'pop_cliente' foi passado na URL
+    // e, em caso positivo, acrescenta o populate() à consulta
+    if('pop_cliente' in req.query) query.populate('cliente')
+
+    // Verifica se o parâmetro 'pop_produto' foi passado na URL
+    // e, em caso positivo, acrescenta o populate() à consulta
+    if('pop_produto' in req.query) query.populate('itens.produto')
+
+    const result = await query.exec()
+
     // HTTP 200: OK (implícito)
     res.send(result)
   }
@@ -32,7 +43,18 @@ controller.retrieveAll = async function(req, res) {
 
 controller.retrieveOne = async function(req, res) {
   try {
-    const result = await Venda.findById(req.params.id)
+    const query = Venda.findById(req.params.id)
+
+    // Verifica se o parâmetro 'pop_cliente' foi passado na URL
+    // e, em caso positivo, acrescenta o populate() à consulta
+    if('pop_cliente' in req.query) query.populate('cliente')
+
+    // Verifica se o parâmetro 'pop_produto' foi passado na URL
+    // e, em caso positivo, acrescenta o populate() à consulta
+    if('pop_produto' in req.query) query.populate('itens.produto')
+
+    const result = await query.exec()
+
     // Documento encontrado ~> HTTP 200: OK (implícito)
     if(result) res.send(result)
     // Documento não encontrado ~> HTTP 404: Not Found
@@ -67,6 +89,53 @@ controller.delete = async function(req, res) {
     if(result) res.status(204).end()
     // Documento não encontrado (e não excluído) ~> HTTP 404: Not Found
     else res.status(404).end()
+  }
+  catch(error) {
+    console.error(error)
+    // HTTP 500: Internal Server Error
+    res.status(500).end()
+  }
+}
+
+controller.updateItem = async function(req, res) {
+  try {
+    //1) Procurando pela venda na qual o novo item sera inserido
+    const venda = await Venda.findById(req.params.id_venda)
+
+    // 2) Se a venda nao for encontrada, retorna HTTP 404: Not Found
+    if(!venda) return res.status(404).end()
+
+    // 3) Percorre cada um dos campos de request.body e atualiza o
+    // valor do campo correspondente no item
+    for(let field in req.body) {
+      venda.itens.id(req.params.itemId)[field] = req.body[field]
+      }
+      venda.markModified('itens')
+  }
+  catch(error) {
+    console.error(error)
+    // HTTP 500: Internal Server Error
+    res.status(500).end()
+  }
+}
+
+controller.deleteItem = async function(req, res) {
+  try {
+    const venda = await Venda.findById(req.params.id)
+
+    // 2) Se a venda nao for encontrada, retorna HTTP 404: Not Found
+    if(!venda) return res.status(404).end()
+
+    // 3) Remove o item
+    venda.itens.id(req.params.itemId).deleteOne()
+    venda.markModified('itens')
+
+    await venda.save()
+    
+    // Encontrou e excluiu ~> HTTP 204: No Content
+    if(result) res.status(204).end()
+      // Nao encontrou (e não excluído) ~> HTTP 404: Not Found
+      else res.status(404).end()
   }
   catch(error) {
     console.error(error)
